@@ -12,15 +12,18 @@ class NUMBERBASEBALLT_API UNBChatInput : public UUserWidget
 {
     GENERATED_BODY()
 
-protected:
+public:
     virtual void NativeConstruct() override;
+
     virtual void NativeDestruct() override;
 
+protected:
     UFUNCTION()
     void OnChatInputTextCommitted(
         const FText& Text,
         ETextCommit::Type CommitMethod);
-    // 블루프린트에 만든 입력창과 C++ 변수를 연결
+
+public:
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UEditableTextBox> EditableTextBox_ChatInput;
 };

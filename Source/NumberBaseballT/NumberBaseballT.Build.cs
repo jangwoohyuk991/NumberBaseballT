@@ -13,6 +13,7 @@ public class NumberBaseballT : ModuleRules
             "Engine",
             "InputCore",
             "EnhancedInput",
+
             "UMG",
             "Slate",
             "SlateCore"
@@ -20,6 +21,9 @@ public class NumberBaseballT : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new string[] { });
 
-        PublicIncludePaths.Add(ModuleDirectory);
+        PublicIncludePaths.AddRange(new string[]
+        {
+            "NumberBaseballT"
+        });
     }
 }

@@ -1,4 +1,5 @@
 #include "UI/NBChatInput.h"
+
 #include "Components/EditableTextBox.h"
 #include "Player/NBPlayerController.h"
 
@@ -6,44 +7,50 @@ void UNBChatInput::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (IsValid(EditableTextBox_ChatInput))
+    if (EditableTextBox_ChatInput->OnTextCommitted.IsAlreadyBound(
+        this,
+        &ThisClass::OnChatInputTextCommitted) == false)
     {
-        EditableTextBox_ChatInput->OnTextCommitted.AddUniqueDynamic(
+        EditableTextBox_ChatInput->OnTextCommitted.AddDynamic(
             this,
-            &UNBChatInput::OnChatInputTextCommitted);
+            &ThisClass::OnChatInputTextCommitted);
     }
 }
 
 void UNBChatInput::NativeDestruct()
 {
-    if (IsValid(EditableTextBox_ChatInput))
+    Super::NativeDestruct();
+
+    if (EditableTextBox_ChatInput->OnTextCommitted.IsAlreadyBound(
+        this,
+        &ThisClass::OnChatInputTextCommitted) == true)
     {
         EditableTextBox_ChatInput->OnTextCommitted.RemoveDynamic(
             this,
-            &UNBChatInput::OnChatInputTextCommitted);
+            &ThisClass::OnChatInputTextCommitted);
     }
-
-    Super::NativeDestruct();
 }
 
 void UNBChatInput::OnChatInputTextCommitted(
     const FText& Text,
     ETextCommit::Type CommitMethod)
 {
-    if (CommitMethod != ETextCommit::OnEnter)
+    if (CommitMethod == ETextCommit::OnEnter)
     {
-        return;
+        APlayerController* OwningPlayerController = GetOwningPlayer();
+
+        if (IsValid(OwningPlayerController) == true)
+        {
+            ANBPlayerController* OwningNBPlayerController =
+                Cast<ANBPlayerController>(OwningPlayerController);
+
+            if (IsValid(OwningNBPlayerController) == true)
+            {
+                OwningNBPlayerController->SetChatMessageString(
+                    Text.ToString());
+
+                EditableTextBox_ChatInput->SetText(FText());
+            }
+        }
     }
-
-    ANBPlayerController* OwningController =
-        Cast<ANBPlayerController>(GetOwningPlayer());
-
-    if (!IsValid(OwningController))
-    {
-        return;
-    }
-
-    OwningController->SetChatMessageString(Text.ToString());
-
-    EditableTextBox_ChatInput->SetText(FText::GetEmpty());
 }
