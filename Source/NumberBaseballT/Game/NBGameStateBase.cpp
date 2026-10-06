@@ -9,7 +9,9 @@ void ANBGameStateBase::MulticastRPCBroadcastLoginMessage_Implementation(
     if (HasAuthority() == false)
     {
         APlayerController* PC =
-            UGameplayStatics::GetPlayerController(GetWorld(), 0);
+            UGameplayStatics::GetPlayerController(
+                GetWorld(),
+                0);
 
         if (IsValid(PC) == true)
         {
@@ -19,9 +21,11 @@ void ANBGameStateBase::MulticastRPCBroadcastLoginMessage_Implementation(
             if (IsValid(NBPC) == true)
             {
                 FString NotificationString =
-                    InNameString + TEXT(" has joined the game.");
+                    InNameString +
+                    TEXT(" has joined the game.");
 
-                NBPC->PrintChatMessageString(NotificationString);
+                NBPC->PrintChatMessageString(
+                    NotificationString);
             }
         }
     }

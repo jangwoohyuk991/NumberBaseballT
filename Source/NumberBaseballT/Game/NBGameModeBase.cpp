@@ -2,21 +2,8 @@
 
 #include "Game/NBGameStateBase.h"
 #include "Player/NBPlayerController.h"
+#include "EngineUtils.h"
 #include "Player/NBPlayerState.h"
-
-void ANBGameModeBase::BeginPlay()
-{
-    Super::BeginPlay();
-
-    SecretNumberString = GenerateSecretNumber();
-
-    // 필수 기능 가이드의 서버 정답 로그 확인용.
-    UE_LOG(
-        LogTemp,
-        Log,
-        TEXT("SecretNumber: %s"),
-        *SecretNumberString);
-}
 
 void ANBGameModeBase::OnPostLogin(AController* NewPlayer)
 {
@@ -27,11 +14,11 @@ void ANBGameModeBase::OnPostLogin(AController* NewPlayer)
 
     if (IsValid(NBPlayerController) == true)
     {
-        AllPlayerControllers.Add(NBPlayerController);
-
         NBPlayerController->NotificationText =
             FText::FromString(
                 TEXT("Connected to the game server."));
+
+        AllPlayerControllers.Add(NBPlayerController);
 
         ANBPlayerState* NBPS =
             NBPlayerController->GetPlayerState<ANBPlayerState>();
@@ -52,6 +39,13 @@ void ANBGameModeBase::OnPostLogin(AController* NewPlayer)
             }
         }
     }
+}
+
+void ANBGameModeBase::BeginPlay()
+{
+    Super::BeginPlay();
+
+    SecretNumberString = GenerateSecretNumber();
 }
 
 FString ANBGameModeBase::GenerateSecretNumber()
@@ -79,7 +73,6 @@ FString ANBGameModeBase::GenerateSecretNumber()
             FMath::RandRange(0, Numbers.Num() - 1);
 
         Result.Append(FString::FromInt(Numbers[Index]));
-
         Numbers.RemoveAt(Index);
     }
 
@@ -103,7 +96,7 @@ bool ANBGameModeBase::IsGuessNumberString(
 
         for (TCHAR C : InNumberString)
         {
-            // 필수 구현사항: 허용 범위를 1~9로 한정한다.
+            // 정답과 같은 1~9 범위만 허용한다.
             if (C < TEXT('1') || C > TEXT('9'))
             {
                 bIsUnique = false;
@@ -113,7 +106,7 @@ bool ANBGameModeBase::IsGuessNumberString(
             UniqueDigits.Add(C);
         }
 
-        // 필수 구현사항: 중복된 숫자는 허용하지 않는다.
+        // 서로 다른 숫자가 정확히 3개인지 확인한다.
         if (bIsUnique == false || UniqueDigits.Num() != 3)
         {
             break;
@@ -141,9 +134,10 @@ FString ANBGameModeBase::JudgeResult(
         }
         else
         {
-            FString PlayerGuessChar = FString::Printf(
-                TEXT("%c"),
-                InGuessNumberString[i]);
+            FString PlayerGuessChar =
+                FString::Printf(
+                    TEXT("%c"),
+                    InGuessNumberString[i]);
 
             if (InSecretNumberString.Contains(PlayerGuessChar))
             {
@@ -180,50 +174,55 @@ void ANBGameModeBase::PrintChatMessageString(
         return;
     }
 
-    // 필수 구현사항: 마지막 세 글자가 아니라 입력 전체를 검사한다.
-    if (IsGuessNumberString(InChatMessageString) == false)
+    
+    // 마지막 세 글자가 아니라 사용자 입력 전체를 검사한다.
+    FString GuessNumberString = InChatMessageString;
+
+    if (IsGuessNumberString(GuessNumberString) == false)
     {
-        // 강의의 처리: 유효한 숫자가 아니면 일반 채팅으로 전달한다.
+        // 일반 채팅 공유 처리를 유지한다.
         FString CombinedMessageString =
             NBPS->GetPlayerInfoString() +
             TEXT(": ") +
             InChatMessageString;
 
-        for (const auto& Controller : AllPlayerControllers)
+        for (TActorIterator<ANBPlayerController> It(GetWorld());
+            It;
+            ++It)
         {
-            ANBPlayerController* PC = Controller.Get();
+            ANBPlayerController* NBPlayerController = *It;
 
-            if (IsValid(PC) == true)
+            if (IsValid(NBPlayerController) == true)
             {
-                PC->ClientRPCPrintChatMessageString(
+                NBPlayerController->ClientRPCPrintChatMessageString(
                     CombinedMessageString);
             }
         }
 
-        // 필수 구현사항: 잘못된 입력에는 재입력 안내를 출력한다.
+        //  잘못된 입력 안내를 표시하고 기회를 유지한다.
         InChattingPlayerController->ClientRPCPrintChatMessageString(
-            TEXT("다시 입력해주세요. 1~9의 중복되지 않는 숫자 3자리를 입력해주세요."));
+            TEXT("다시 입력하세요. 1~9의 중복되지 않은 3자리 숫자를 입력해주세요."));
 
-        // 잘못된 입력은 시도 횟수를 증가시키지 않는다.
         return;
     }
 
-    // 필수 구현사항: 기회를 소진한 플레이어의 추가 추측을 막는다.
+    // 기회를 모두 쓴 플레이어의 추가 추측을 막는다.
     if (NBPS->CurrentGuessCount >= NBPS->MaxGuessCount)
     {
         InChattingPlayerController->ClientRPCPrintChatMessageString(
-            TEXT("기회를 모두 사용했습니다. 다른 플레이어의 결과를 기다려주세요."));
+            TEXT("3번의 기회를 모두 사용했습니다."));
 
         return;
     }
 
-    FString JudgeResultString = JudgeResult(
-        SecretNumberString,
-        InChatMessageString);
+    FString JudgeResultString =
+        JudgeResult(
+            SecretNumberString,
+            GuessNumberString);
 
     IncreaseGuessCount(InChattingPlayerController);
 
-    // 서버에서 증가시킨 최신 횟수를 붙인다.
+    //  횟수를 증가시킨 뒤 Getter를 호출한다.
     FString CombinedMessageString =
         NBPS->GetPlayerInfoString() +
         TEXT(": ") +
@@ -231,21 +230,23 @@ void ANBGameModeBase::PrintChatMessageString(
         TEXT(" -> ") +
         JudgeResultString;
 
-    for (const auto& Controller : AllPlayerControllers)
+    for (TActorIterator<ANBPlayerController> It(GetWorld());
+        It;
+        ++It)
     {
-        ANBPlayerController* PC = Controller.Get();
+        ANBPlayerController* NBPlayerController = *It;
 
-        if (IsValid(PC) == true)
+        if (IsValid(NBPlayerController) == true)
         {
-            PC->ClientRPCPrintChatMessageString(
+            NBPlayerController->ClientRPCPrintChatMessageString(
                 CombinedMessageString);
         }
     }
 
+    // 모든 플레이어에게 결과를 보낸 뒤 한 번 판정한다.
     int32 StrikeCount =
         FCString::Atoi(*JudgeResultString.Left(1));
 
-    // 출력 반복문 밖에서 한 번만 판정한다.
     JudgeGame(InChattingPlayerController, StrikeCount);
 }
 
@@ -261,53 +262,70 @@ void ANBGameModeBase::IncreaseGuessCount(
     }
 }
 
+void ANBGameModeBase::ResetGame()
+{
+    SecretNumberString = GenerateSecretNumber();
+
+    for (const auto& NBPlayerController : AllPlayerControllers)
+    {
+        if (IsValid(NBPlayerController) == false)
+        {
+            continue;
+        }
+
+        ANBPlayerState* NBPS =
+            NBPlayerController->GetPlayerState<ANBPlayerState>();
+
+        if (IsValid(NBPS) == true)
+        {
+            NBPS->CurrentGuessCount = 0;
+        }
+    }
+}
+
 void ANBGameModeBase::JudgeGame(
     ANBPlayerController* InChattingPlayerController,
-    int32 InStrikeCount)
+    int InStrikeCount)
 {
-    if (InStrikeCount == 3)
+    if (3 == InStrikeCount)
     {
-        ANBPlayerState* WinnerPS =
+        ANBPlayerState* NBPS =
             InChattingPlayerController->GetPlayerState<ANBPlayerState>();
 
-        if (IsValid(WinnerPS) == false)
+        if (IsValid(NBPS) == false)
         {
             return;
         }
 
         FString CombinedMessageString =
-            WinnerPS->PlayerNameString +
+            NBPS->PlayerNameString +
             TEXT(" has won the game.");
 
-        for (const auto& Controller : AllPlayerControllers)
+        for (const auto& NBPlayerController : AllPlayerControllers)
         {
-            ANBPlayerController* PC = Controller.Get();
-
-            if (IsValid(PC) == true)
+            if (IsValid(NBPlayerController) == true)
             {
-                PC->NotificationText =
+                NBPlayerController->NotificationText =
                     FText::FromString(CombinedMessageString);
             }
         }
 
-        // 모든 플레이어에게 알린 뒤 한 번만 리셋한다.
+        // 모든 플레이어에게 공지를 설정한 뒤 한 번 리셋한다.
         ResetGame();
         return;
     }
 
     bool bIsDraw = true;
 
-    for (const auto& Controller : AllPlayerControllers)
+    for (const auto& NBPlayerController : AllPlayerControllers)
     {
-        ANBPlayerController* PC = Controller.Get();
-
-        if (IsValid(PC) == false)
+        if (IsValid(NBPlayerController) == false)
         {
             continue;
         }
 
         ANBPlayerState* NBPS =
-            PC->GetPlayerState<ANBPlayerState>();
+            NBPlayerController->GetPlayerState<ANBPlayerState>();
 
         if (IsValid(NBPS) == false)
         {
@@ -324,47 +342,16 @@ void ANBGameModeBase::JudgeGame(
 
     if (bIsDraw == true)
     {
-        for (const auto& Controller : AllPlayerControllers)
+        for (const auto& NBPlayerController : AllPlayerControllers)
         {
-            ANBPlayerController* PC = Controller.Get();
-
-            if (IsValid(PC) == true)
+            if (IsValid(NBPlayerController) == true)
             {
-                PC->NotificationText =
+                NBPlayerController->NotificationText =
                     FText::FromString(TEXT("Draw..."));
             }
         }
 
-        // 모든 플레이어에게 알린 뒤 한 번만 리셋한다.
+        // 모든 플레이어에게 공지를 설정한 뒤 한 번 리셋한다.
         ResetGame();
     }
-}
-
-void ANBGameModeBase::ResetGame()
-{
-    SecretNumberString = GenerateSecretNumber();
-
-    for (const auto& Controller : AllPlayerControllers)
-    {
-        ANBPlayerController* PC = Controller.Get();
-
-        if (IsValid(PC) == false)
-        {
-            continue;
-        }
-
-        ANBPlayerState* NBPS =
-            PC->GetPlayerState<ANBPlayerState>();
-
-        if (IsValid(NBPS) == true)
-        {
-            NBPS->CurrentGuessCount = 0;
-        }
-    }
-
-    UE_LOG(
-        LogTemp,
-        Log,
-        TEXT("SecretNumber: %s"),
-        *SecretNumberString);
 }

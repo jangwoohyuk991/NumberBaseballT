@@ -2,8 +2,10 @@
 
 #include "NumberBaseballT.h"
 #include "UI/NBChatInput.h"
-#include "Game/NBGameModeBase.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "Game/NBGameModeBase.h"
+#include "Player/NBPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 ANBPlayerController::ANBPlayerController()
@@ -65,9 +67,8 @@ void ANBPlayerController::SetChatMessageString(
 
     if (IsLocalController() == true)
     {
-        // [필수 보완]
-        // 전체 입력을 검사하도록 원문을 서버에 전달한다.
-        // 플레이어 정보는 서버에서 메시지에 붙인다.
+        
+        // 입력 전체를 검사할 수 있도록 원문을 서버에 전달한다.
         ServerRPCPrintChatMessageString(ChatMessageString);
     }
 }

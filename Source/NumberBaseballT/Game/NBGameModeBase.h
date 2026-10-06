@@ -12,13 +12,9 @@ class NUMBERBASEBALLT_API ANBGameModeBase : public AGameModeBase
     GENERATED_BODY()
 
 public:
-    virtual void BeginPlay() override;
-
     virtual void OnPostLogin(AController* NewPlayer) override;
 
-    void PrintChatMessageString(
-        ANBPlayerController* InChattingPlayerController,
-        const FString& InChatMessageString);
+    virtual void BeginPlay() override;
 
     FString GenerateSecretNumber();
 
@@ -28,14 +24,18 @@ public:
         const FString& InSecretNumberString,
         const FString& InGuessNumberString);
 
+    void PrintChatMessageString(
+        ANBPlayerController* InChattingPlayerController,
+        const FString& InChatMessageString);
+
     void IncreaseGuessCount(
         ANBPlayerController* InChattingPlayerController);
 
+    void ResetGame();
+
     void JudgeGame(
         ANBPlayerController* InChattingPlayerController,
-        int32 InStrikeCount);
-
-    void ResetGame();
+        int InStrikeCount);
 
 protected:
     FString SecretNumberString;
